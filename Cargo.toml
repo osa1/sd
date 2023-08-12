@@ -24,7 +24,6 @@ unescape = "0.1"
 walkdir = "2.3"
 
 [dev-dependencies]
-anyhow = "1.0.38"
 assert_cmd = "1.0.3"
 
 [profile.release]
