@@ -7,12 +7,16 @@ use std::{
 pub enum Error {
     #[error("invalid regex {0}")]
     Regex(#[from] regex::Error),
+
     #[error(transparent)]
     File(#[from] std::io::Error),
+
     #[error("failed to move file: {0}")]
     TempfilePersist(#[from] tempfile::PersistError),
+
     #[error("file doesn't have parent path: {0}")]
     InvalidPath(PathBuf),
+
     #[error("failed processing files:\n{0}")]
     FailedProcessing(FailedJobs),
 }
@@ -36,8 +40,8 @@ impl fmt::Display for FailedJobs {
 }
 
 // pretty-print the error
-impl std::fmt::Debug for Error {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl fmt::Debug for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self)
     }
 }

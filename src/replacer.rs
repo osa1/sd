@@ -1,4 +1,4 @@
-use crate::{utils, Error, Result};
+use crate::{Error, Result};
 use regex::bytes::Regex;
 use std::{fs, fs::File, io::prelude::*, path::Path};
 
@@ -22,7 +22,7 @@ impl Replacer {
         } else {
             (
                 look_for,
-                utils::unescape(&replace_with)
+                unescape::unescape(&replace_with)
                     .unwrap_or(replace_with)
                     .into_bytes(),
             )
@@ -74,10 +74,7 @@ impl Replacer {
         Ok(())
     }
 
-    pub(crate) fn replace<'a>(
-        &'a self,
-        content: &'a [u8],
-    ) -> std::borrow::Cow<'a, [u8]> {
+    pub(crate) fn replace<'a>(&'a self, content: &'a [u8]) -> std::borrow::Cow<'a, [u8]> {
         if self.is_literal {
             self.regex.replacen(
                 content,
@@ -90,10 +87,7 @@ impl Replacer {
         }
     }
 
-    pub(crate) fn replace_preview<'a>(
-        &'a self,
-        content: &[u8],
-    ) -> std::borrow::Cow<'a, [u8]> {
+    pub(crate) fn replace_preview<'a>(&'a self, content: &[u8]) -> std::borrow::Cow<'a, [u8]> {
         let mut v = Vec::<u8>::new();
         let mut captures = self.regex.captures_iter(content);
 
@@ -102,18 +96,13 @@ impl Replacer {
 
             v.extend(sur_text);
             if let Some(capture) = captures.next() {
-                v.extend_from_slice(
-                    ansi_term::Color::Green.prefix().to_string().as_bytes(),
-                );
+                v.extend_from_slice(ansi_term::Color::Green.prefix().to_string().as_bytes());
                 if self.is_literal {
-                    regex::bytes::NoExpand(&self.replace_with)
-                        .replace_append(&capture, &mut v);
+                    regex::bytes::NoExpand(&self.replace_with).replace_append(&capture, &mut v);
                 } else {
                     (&*self.replace_with).replace_append(&capture, &mut v);
                 }
-                v.extend_from_slice(
-                    ansi_term::Color::Green.suffix().to_string().as_bytes(),
-                );
+                v.extend_from_slice(ansi_term::Color::Green.suffix().to_string().as_bytes());
             }
         });
 

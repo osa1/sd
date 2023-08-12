@@ -1,15 +1,13 @@
 mod cli;
 mod error;
 mod input;
+mod replacer;
 
-pub(crate) mod replacer;
-pub(crate) mod utils;
-
-pub(crate) use self::input::{App, Source};
-pub(crate) use error::{Error, Result};
-use replacer::Replacer;
+use self::input::{App, Source};
+use error::{Error, Result};
 
 use clap::Parser;
+use replacer::Replacer;
 
 fn main() -> Result<()> {
     let options = cli::Options::parse();
@@ -32,6 +30,5 @@ fn main() -> Result<()> {
             options.replacements,
         )?,
     )
-    .run(options.preview)?;
-    Ok(())
+    .run(options.preview)
 }

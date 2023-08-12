@@ -1,8 +1,6 @@
-use std::{fs::File, io::prelude::*, path::PathBuf};
+use std::{fs::File, io::prelude::*, io::IsTerminal, path::PathBuf};
 
 use crate::{Error, Replacer, Result};
-
-use is_terminal::IsTerminal;
 
 #[derive(Debug)]
 pub(crate) enum Source {
@@ -36,6 +34,7 @@ impl App {
     pub(crate) fn new(source: Source, replacer: Replacer) -> Self {
         Self { source, replacer }
     }
+
     pub(crate) fn run(&self, preview: bool) -> Result<()> {
         let is_tty = std::io::stdout().is_terminal();
 
@@ -57,6 +56,7 @@ impl App {
 
                 Ok(())
             }
+
             (Source::Files(paths), false) => {
                 use rayon::prelude::*;
 
@@ -74,11 +74,11 @@ impl App {
                 if failed_jobs.is_empty() {
                     Ok(())
                 } else {
-                    let failed_jobs =
-                        crate::error::FailedJobs::from(failed_jobs);
+                    let failed_jobs = crate::error::FailedJobs::from(failed_jobs);
                     Err(Error::FailedProcessing(failed_jobs))
                 }
             }
+
             (Source::Files(paths), true) => {
                 let stdout = std::io::stdout();
                 let mut handle = stdout.lock();
@@ -88,19 +88,13 @@ impl App {
                     if Replacer::check_not_empty(File::open(path)?).is_err() {
                         return Ok(());
                     }
-                    let file =
-                        unsafe { memmap2::Mmap::map(&File::open(path)?)? };
+                    let file = unsafe { memmap2::Mmap::map(&File::open(path)?)? };
                     if self.replacer.has_matches(&file) {
                         if print_path {
-                            writeln!(
-                                handle,
-                                "----- FILE {} -----",
-                                path.display()
-                            )?;
+                            writeln!(handle, "----- FILE {} -----", path.display())?;
                         }
 
-                        handle
-                            .write_all(&self.replacer.replace_preview(&file))?;
+                        handle.write_all(&self.replacer.replace_preview(&file))?;
                         writeln!(handle)?;
                     }
 

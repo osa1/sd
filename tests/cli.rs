@@ -13,10 +13,7 @@ mod cli {
         assert_eq!(content, std::fs::read_to_string(path).unwrap());
     }
 
-    fn create_soft_link<P: AsRef<std::path::Path>>(
-        src: &P,
-        dst: &P,
-    ) -> Result<()> {
+    fn create_soft_link<P: AsRef<std::path::Path>>(src: &P, dst: &P) -> Result<()> {
         #[cfg(target_family = "unix")]
         std::os::unix::fs::symlink(src, dst)?;
         #[cfg(target_family = "windows")]
