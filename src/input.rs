@@ -1,28 +1,16 @@
-use std::{fs::File, io::prelude::*, io::IsTerminal, path::PathBuf};
+use std::fs::File;
+use std::io::{IsTerminal, Read, Write};
+use std::path::PathBuf;
 
 use crate::{Error, Replacer, Result};
+
+use globwalk::GlobWalkerBuilder;
+use walkdir::DirEntry;
 
 #[derive(Debug)]
 pub(crate) enum Source {
     Stdin,
-    Files(Vec<PathBuf>),
-}
-
-impl Source {
-    pub(crate) fn recursive() -> Result<Self> {
-        Ok(Self::Files(
-            ignore::WalkBuilder::new(".")
-                .hidden(false)
-                .filter_entry(|e| e.file_name() != ".git")
-                .build()
-                .filter_map(|d| d.ok())
-                .filter_map(|d| match d.file_type() {
-                    Some(t) if t.is_file() => Some(d.into_path()),
-                    _ => None,
-                })
-                .collect(),
-        ))
-    }
+    Files(Vec<String>),
 }
 
 pub(crate) struct App {
@@ -48,11 +36,11 @@ impl App {
                 let stdout = std::io::stdout();
                 let mut handle = stdout.lock();
 
-                handle.write_all(&if is_tty {
-                    self.replacer.replace_preview(&buffer)
+                if is_tty {
+                    handle.write_all(&self.replacer.replace_preview(&buffer))?;
                 } else {
-                    self.replacer.replace(&buffer)
-                })?;
+                    handle.write_all(&self.replacer.replace(&buffer))?;
+                }
 
                 Ok(())
             }
@@ -60,13 +48,20 @@ impl App {
             (Source::Files(paths), false) => {
                 use rayon::prelude::*;
 
-                let failed_jobs: Vec<_> = paths
-                    .par_iter()
+                let walker = GlobWalkerBuilder::from_patterns(".", paths)
+                    .build()
+                    .unwrap();
+
+                let failed_jobs: Vec<(Option<PathBuf>, Error)> = walker
+                    .par_bridge()
                     .filter_map(|p| {
-                        if let Err(e) = self.replacer.replace_file(p) {
-                            Some((p.to_owned(), e))
-                        } else {
-                            None
+                        let p: DirEntry = match p {
+                            Ok(p) => p,
+                            Err(e) => return Some((None, Error::Walkdir(e))),
+                        };
+                        match self.replacer.replace_file(&p) {
+                            Ok(()) => None,
+                            Err(e) => Some((Some(p.into_path()), e)),
                         }
                     })
                     .collect();
@@ -74,7 +69,7 @@ impl App {
                 if failed_jobs.is_empty() {
                     Ok(())
                 } else {
-                    let failed_jobs = crate::error::FailedJobs::from(failed_jobs);
+                    let failed_jobs = crate::error::FailedJobs(failed_jobs);
                     Err(Error::FailedProcessing(failed_jobs))
                 }
             }
@@ -82,24 +77,26 @@ impl App {
             (Source::Files(paths), true) => {
                 let stdout = std::io::stdout();
                 let mut handle = stdout.lock();
-                let print_path = paths.len() > 1;
 
-                paths.iter().try_for_each(|path| {
-                    if Replacer::check_not_empty(File::open(path)?).is_err() {
-                        return Ok(());
-                    }
+                let walker = GlobWalkerBuilder::from_patterns(".", paths)
+                    .build()
+                    .unwrap();
+
+                for dir_entry in walker {
+                    let dir_entry: DirEntry = match dir_entry {
+                        Ok(p) => p,
+                        Err(_) => break,
+                    };
+                    let path = dir_entry.path();
                     let file = unsafe { memmap2::Mmap::map(&File::open(path)?)? };
                     if self.replacer.has_matches(&file) {
-                        if print_path {
-                            writeln!(handle, "----- FILE {} -----", path.display())?;
-                        }
-
+                        writeln!(handle, "----- FILE {} -----", path.to_string_lossy())?;
                         handle.write_all(&self.replacer.replace_preview(&file))?;
                         writeln!(handle)?;
                     }
+                }
 
-                    Ok(())
-                })
+                Ok(())
             }
         }
     }

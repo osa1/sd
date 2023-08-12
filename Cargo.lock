@@ -601,13 +601,13 @@ dependencies = [
  "assert_cmd",
  "clap",
  "globwalk",
- "ignore",
  "memmap2",
  "rayon",
  "regex",
  "tempfile",
  "thiserror",
  "unescape",
+ "walkdir",
 ]
 
 [[package]]

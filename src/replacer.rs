@@ -1,6 +1,13 @@
+use std::borrow::Cow;
+use std::fs::{self, File};
+use std::io::Write;
+use std::ops::DerefMut;
+
 use crate::{Error, Result};
+
+use memmap2::{Mmap, MmapMut};
 use regex::bytes::Regex;
-use std::{fs, fs::File, io::prelude::*, path::Path};
+use walkdir::DirEntry;
 
 pub(crate) struct Replacer {
     regex: Regex,
@@ -68,13 +75,7 @@ impl Replacer {
         self.regex.is_match(content)
     }
 
-    pub(crate) fn check_not_empty(mut file: File) -> Result<()> {
-        let mut buf: [u8; 1] = Default::default();
-        file.read_exact(&mut buf)?;
-        Ok(())
-    }
-
-    pub(crate) fn replace<'a>(&'a self, content: &'a [u8]) -> std::borrow::Cow<'a, [u8]> {
+    pub(crate) fn replace<'a>(&'a self, content: &'a [u8]) -> Cow<'a, [u8]> {
         if self.is_literal {
             self.regex.replacen(
                 content,
@@ -87,7 +88,7 @@ impl Replacer {
         }
     }
 
-    pub(crate) fn replace_preview<'a>(&'a self, content: &[u8]) -> std::borrow::Cow<'a, [u8]> {
+    pub(crate) fn replace_preview(&self, content: &[u8]) -> Vec<u8> {
         let mut v = Vec::<u8>::new();
         let mut captures = self.regex.captures_iter(content);
 
@@ -106,19 +107,13 @@ impl Replacer {
             }
         });
 
-        return std::borrow::Cow::Owned(v);
+        v
     }
 
-    pub(crate) fn replace_file(&self, path: &Path) -> Result<()> {
-        use memmap2::{Mmap, MmapMut};
-        use std::ops::DerefMut;
-
-        if Self::check_not_empty(File::open(path)?).is_err() {
-            return Ok(());
-        }
-
+    pub(crate) fn replace_file(&self, dir_entry: &DirEntry) -> Result<()> {
+        let path = dir_entry.path();
         let source = File::open(path)?;
-        let meta = fs::metadata(path)?;
+        let meta = dir_entry.metadata()?;
         let mmap_source = unsafe { Mmap::map(&source)? };
         let replaced = self.replace(&mmap_source);
 

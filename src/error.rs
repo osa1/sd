@@ -1,7 +1,5 @@
-use std::{
-    fmt::{self, Write},
-    path::PathBuf,
-};
+use std::fmt::{self, Write};
+use std::path::PathBuf;
 
 #[derive(thiserror::Error)]
 pub enum Error {
@@ -19,15 +17,12 @@ pub enum Error {
 
     #[error("failed processing files:\n{0}")]
     FailedProcessing(FailedJobs),
+
+    #[error("failed walking directories:\n{0}")]
+    Walkdir(#[from] walkdir::Error),
 }
 
-pub struct FailedJobs(Vec<(PathBuf, Error)>);
-
-impl From<Vec<(PathBuf, Error)>> for FailedJobs {
-    fn from(vec: Vec<(PathBuf, Error)>) -> Self {
-        Self(vec)
-    }
-}
+pub struct FailedJobs(pub Vec<(Option<PathBuf>, Error)>);
 
 impl fmt::Display for FailedJobs {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -39,7 +34,6 @@ impl fmt::Display for FailedJobs {
     }
 }
 
-// pretty-print the error
 impl fmt::Debug for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self)

@@ -12,10 +12,8 @@ use replacer::Replacer;
 fn main() -> Result<()> {
     let options = cli::Options::parse();
 
-    let source = if options.recursive {
-        Source::recursive()?
-    } else if !options.files.is_empty() {
-        Source::Files(options.files)
+    let source = if !options.globs.is_empty() {
+        Source::Files(options.globs)
     } else {
         Source::Stdin
     };
