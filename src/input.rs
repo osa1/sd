@@ -1,5 +1,5 @@
 use std::fs::File;
-use std::io::{IsTerminal, Read, Write};
+use std::io::{self, IsTerminal, Read, Write};
 use std::path::PathBuf;
 
 use crate::{Error, Replacer, Result};
@@ -24,16 +24,16 @@ impl App {
     }
 
     pub(crate) fn run(&self, preview: bool) -> Result<()> {
-        let is_tty = std::io::stdout().is_terminal();
+        let is_tty = io::stdout().is_terminal();
 
         match (&self.source, preview) {
             (Source::Stdin, _) => {
                 let mut buffer = Vec::with_capacity(256);
-                let stdin = std::io::stdin();
+                let stdin = io::stdin();
                 let mut handle = stdin.lock();
                 handle.read_to_end(&mut buffer)?;
 
-                let stdout = std::io::stdout();
+                let stdout = io::stdout();
                 let mut handle = stdout.lock();
 
                 if is_tty {
@@ -45,10 +45,10 @@ impl App {
                 Ok(())
             }
 
-            (Source::Files(paths), false) => {
+            (Source::Files(globs), false) => {
                 use rayon::prelude::*;
 
-                let walker = GlobWalkerBuilder::from_patterns(".", paths)
+                let walker = GlobWalkerBuilder::from_patterns(".", globs)
                     .build()
                     .unwrap();
 
@@ -74,11 +74,11 @@ impl App {
                 }
             }
 
-            (Source::Files(paths), true) => {
-                let stdout = std::io::stdout();
+            (Source::Files(globs), true) => {
+                let stdout = io::stdout();
                 let mut handle = stdout.lock();
 
-                let walker = GlobWalkerBuilder::from_patterns(".", paths)
+                let walker = GlobWalkerBuilder::from_patterns(".", globs)
                     .build()
                     .unwrap();
 
