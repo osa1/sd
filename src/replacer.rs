@@ -2,12 +2,12 @@ use std::borrow::Cow;
 use std::fs::{self, File};
 use std::io::Write;
 use std::ops::DerefMut;
+use std::path::Path;
 
 use crate::{Error, Result};
 
 use memmap2::{Mmap, MmapMut};
 use regex::bytes::Regex;
-use walkdir::DirEntry;
 
 pub(crate) struct Replacer {
     regex: Regex,
@@ -110,10 +110,9 @@ impl Replacer {
         v
     }
 
-    pub(crate) fn replace_file(&self, dir_entry: &DirEntry) -> Result<()> {
-        let path = dir_entry.path();
+    pub(crate) fn replace_file(&self, path: &Path) -> Result<()> {
         let source = File::open(path)?;
-        let meta = dir_entry.metadata()?;
+        let meta = fs::metadata(path)?;
         let mmap_source = unsafe { Mmap::map(&source)? };
         let replaced = self.replace(&mmap_source);
 

@@ -70,11 +70,14 @@ mod cli {
         let mut file = tempfile::NamedTempFile::new().unwrap();
         file.write_all(b"abc123def").unwrap();
 
-        sd().args(["-p", "abc\\d+", "", file.path().to_str().unwrap()])
+        let file_path_str = file.path().to_str().unwrap();
+
+        sd().args(["-p", "abc\\d+", "", file_path_str])
             .assert()
             .success()
             .stdout(format!(
-                "{}{}def\n",
+                "----- FILE {} -----\n{}{}def\n",
+                file_path_str,
                 ansi_term::Color::Green.prefix(),
                 ansi_term::Color::Green.suffix()
             ));

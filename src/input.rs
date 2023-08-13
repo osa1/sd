@@ -2,10 +2,8 @@ use std::fs::File;
 use std::io::{self, IsTerminal, Read, Write};
 use std::path::PathBuf;
 
-use crate::{Error, Replacer, Result};
-
-use globwalk::GlobWalkerBuilder;
-use walkdir::DirEntry;
+use crate::error::{Error, FailedJobs};
+use crate::{Replacer, Result};
 
 #[derive(Debug)]
 pub(crate) enum Source {
@@ -48,29 +46,33 @@ impl App {
             (Source::Files(globs), false) => {
                 use rayon::prelude::*;
 
-                let walker = GlobWalkerBuilder::from_patterns(".", globs)
-                    .build()
-                    .unwrap();
+                let mut errors: Vec<Error> = Vec::new();
+                let mut paths: Vec<PathBuf> = Vec::new();
+                for glob in globs {
+                    collect_glob_paths(glob, &mut paths, &mut errors);
+                }
 
-                let failed_jobs: Vec<(Option<PathBuf>, Error)> = walker
-                    .par_bridge()
+                let replace_errors: Vec<(Option<PathBuf>, Error)> = paths
+                    .par_iter()
                     .filter_map(|p| {
-                        let p: DirEntry = match p {
-                            Ok(p) => p,
-                            Err(e) => return Some((None, Error::Walkdir(e))),
-                        };
-                        match self.replacer.replace_file(&p) {
-                            Ok(()) => None,
-                            Err(e) => Some((Some(p.into_path()), e)),
+                        if let Err(e) = self.replacer.replace_file(p) {
+                            Some((Some(p.to_owned()), e))
+                        } else {
+                            None
                         }
                     })
+                    .collect();
+
+                let failed_jobs: Vec<(Option<PathBuf>, Error)> = errors
+                    .into_iter()
+                    .map(|e| (None, e))
+                    .chain(replace_errors.into_iter())
                     .collect();
 
                 if failed_jobs.is_empty() {
                     Ok(())
                 } else {
-                    let failed_jobs = crate::error::FailedJobs(failed_jobs);
-                    Err(Error::FailedProcessing(failed_jobs))
+                    Err(Error::FailedProcessing(FailedJobs(failed_jobs)))
                 }
             }
 
@@ -78,17 +80,18 @@ impl App {
                 let stdout = io::stdout();
                 let mut handle = stdout.lock();
 
-                let walker = GlobWalkerBuilder::from_patterns(".", globs)
-                    .build()
-                    .unwrap();
+                let mut errors: Vec<Error> = Vec::new();
+                let mut paths: Vec<PathBuf> = Vec::new();
+                for glob in globs {
+                    collect_glob_paths(glob, &mut paths, &mut errors);
+                }
 
-                for dir_entry in walker {
-                    let dir_entry: DirEntry = match dir_entry {
-                        Ok(p) => p,
-                        Err(_) => break,
-                    };
-                    let path = dir_entry.path();
-                    let file = unsafe { memmap2::Mmap::map(&File::open(path)?)? };
+                for error in errors {
+                    writeln!(handle, "{}", error)?;
+                }
+
+                for path in paths {
+                    let file = unsafe { memmap2::Mmap::map(&File::open(&path)?)? };
                     if self.replacer.has_matches(&file) {
                         writeln!(handle, "----- FILE {} -----", path.to_string_lossy())?;
                         handle.write_all(&self.replacer.replace_preview(&file))?;
@@ -98,6 +101,19 @@ impl App {
 
                 Ok(())
             }
+        }
+    }
+}
+
+fn collect_glob_paths(glob: &str, paths: &mut Vec<PathBuf>, errors: &mut Vec<Error>) {
+    let glob_paths = match glob::glob(glob) {
+        Ok(paths) => paths,
+        Err(err) => return errors.push(Error::from(err)),
+    };
+    for path in glob_paths {
+        match path {
+            Ok(path) => paths.push(path),
+            Err(err) => errors.push(Error::from(err)),
         }
     }
 }
