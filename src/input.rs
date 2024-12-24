@@ -66,7 +66,7 @@ impl App {
                 let failed_jobs: Vec<(Option<PathBuf>, Error)> = errors
                     .into_iter()
                     .map(|e| (None, e))
-                    .chain(replace_errors.into_iter())
+                    .chain(replace_errors)
                     .collect();
 
                 if failed_jobs.is_empty() {
