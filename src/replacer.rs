@@ -54,8 +54,7 @@ impl Replacer {
                     },
                     'w' => {
                         regex = regex::bytes::RegexBuilder::new(&format!(
-                            "\\b{}\\b",
-                            look_for
+                            "\\b{look_for}\\b"
                         ));
                     },
                     _ => {},

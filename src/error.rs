@@ -34,7 +34,7 @@ impl fmt::Display for FailedJobs {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("\tFailedJobs(\n")?;
         for (path, err) in &self.0 {
-            f.write_str(&format!("\t{:?}: {}\n", path, err))?;
+            f.write_str(&format!("\t{path:?}: {err}\n"))?;
         }
         f.write_char(')')
     }

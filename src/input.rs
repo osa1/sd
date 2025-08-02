@@ -87,7 +87,7 @@ impl App {
                 }
 
                 for error in errors {
-                    writeln!(handle, "{}", error)?;
+                    writeln!(handle, "{error}")?;
                 }
 
                 for path in paths {
